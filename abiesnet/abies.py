@@ -15,6 +15,10 @@ loader_param = {
     'random_contrast': True
     }
 
+network_param = {
+    'device' : 'gpu:0',
+    }
+
 # --------------------------------------------------------------------------------
 # sub command methods
 # --------------------------------------------------------------------------------
@@ -93,6 +97,29 @@ def do_eval(namespace):
     sess = tf.Session()
     sess.run(tf.initialize_all_variables())
 
+def do_dump_network(namespace):
+    # build
+    reader = tf.WholeFileReader()
+    with tf.variable_scope('image_loader'), tf.device('/cpu:0'):
+        samples = ['dummy']
+
+        batch_images = il.build_full_network(
+            samples, am.INPUT_HEIGHT, am.INPUT_WIDTH, am.INPUT_CHANNELS, 16, reader,
+            **loader_param)
+        image_summary = tf.image_summary('input_image', batch_images)
+
+    with tf.variable_scope(ROOT_VARIABLE_SCOPE):
+        out, train1 = am.build_full_network(batch_images,
+            with_conv1_pre_train=True)
+
+    print('-- variables')
+    for variable in tf.all_variables():
+        print(variable.name)
+
+    print('-- operations')
+    for operation in tf.get_default_graph().get_operations():
+        print(operation.name)
+
 # --------------------------------------------------------------------------------
 # command line option parser
 # --------------------------------------------------------------------------------
@@ -112,6 +139,8 @@ def create_parser():
     sub_parser.set_defaults(func=do_test)
     sub_parser = sub_parsers.add_parser('eval')
     sub_parser.set_defaults(func=do_eval)
+    sub_parser = sub_parsers.add_parser('dump_network')
+    sub_parser.set_defaults(func=do_dump_network)
 
     return parser
 
