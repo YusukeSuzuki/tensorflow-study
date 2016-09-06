@@ -6,32 +6,37 @@ root: !graph_root
     variable: conv1
     nodes:
     - !conv2d
-      name: conv1
-      width: 5
-      height: 5
-      kernel_num: 64
-      source: root
+      {name: conv1, width: 5, height: 5, kernel_num: 64, source: root}
+    - !with
+      variable: pre_train
+      nodes:
+      - !with
+        name: inference
+        nodes:
+        - !conv2d_transpose
+          {name: conv1_transpose, source: conv1, shape_source: root, width: 5, height: 5}
+      - !with
+        name: loss
+        nodes:
+        - !conv2d_ae_loss
+          {name: conv1_ae_loss, source1: root, source2: conv1_transpose}
+      - !with
+        name: train
+        nodes:
+        - !adam_optimizer
+          {name: conv1_optimizer, source: conv1_ae_loss, val: 1e-4}
   - !with
     variable: conv2
     nodes:
     - !conv2d
-      name: conv2
-      width: 5
-      height: 5
-      kernel_num: 64
-      source: conv1
+      {name: conv2, width: 5, height: 5, kernel_num: 64, source: conv1}
   - !with
     variable: conv3
     nodes:
     - !conv2d
-      name: conv3
-      width: 5
-      height: 5
-      kernel_num: 64
-      source: conv2
+      {name: conv3, width: 5, height: 5, kernel_num: 64, source: conv2}
   - !with
     variable: max_pool1
     nodes:
     - !max_pool_2x2
-      name: max_pool1
-      source: conv3
+      {name: max_pool1, source: conv3}

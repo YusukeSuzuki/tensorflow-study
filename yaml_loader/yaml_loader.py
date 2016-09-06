@@ -55,7 +55,7 @@ class With(yaml.YAMLObject):
         self.nodes = nodes
 
         if not variable and not name and not device:
-            return ValueError('variable, name, device are all None')
+            raise ValueError('variable, name, device are all None')
 
         self.variable = variable
         self.name = name
@@ -71,7 +71,7 @@ class With(yaml.YAMLObject):
         variable = dict_representation.get('variable', None)
         name = dict_representation.get('name', None)
         device = dict_representation.get('device', None)
-        return cls(nodes, variable=variable)
+        return cls(nodes, variable=variable, name=name, device=device)
 
     def build(self, nodes):
         vs = lambda x: tf.variable_scope(x) if x else EmptyWith()
@@ -107,6 +107,80 @@ class Conv2d(yaml.YAMLObject):
         b = bias_variable([self.kernel_num], name="bias")
 
         nodes[self.name] = conv2d(source_node, w) + b
+        return nodes
+
+class Conv2dTranspose(yaml.YAMLObject):
+    yaml_tag = u'!conv2d_transpose'
+
+    def __init__(self, name, width, height, source, shape_source):
+        self.name = name
+        self.source = source
+        self.shape_source = shape_source
+        self.width = width
+        self.height = height
+
+    def __repr__(self):
+        return 'Conv2dTranspose'
+
+    def build(self, nodes):
+        source_node = nodes[self.source]
+        shape_source_node = nodes[self.shape_source]
+
+        with tf.name_scope('deconvolution'), tf.device('/cpu:0'):
+            shape = source_node.get_shape()
+            out_shape = shape_source_node.get_shape()
+            filter_var = tf.get_variable('filter',
+                [self.height, self.width, out_shape[3], shape[3]],
+                initializer=tf.truncated_normal_initializer(stddev=0.35))
+        with tf.name_scope('deconvolution'), tf.device('/gpu:0'):
+            nodes[self.name] = tf.nn.conv2d_transpose(
+                source_node, filter_var,
+                shape_source_node.get_shape(), [1,1,1,1])
+
+        return nodes
+
+class Conv2dAELoss(yaml.YAMLObject):
+    yaml_tag = u'!conv2d_ae_loss'
+
+    def __init__(self, name, source1, source2):
+        self.name = name
+        self.source1 = source1
+        self.source2 = source2
+
+    def __repr__(self):
+        return 'Conv2dAELoss'
+
+    def build(self, nodes):
+        source1_node = nodes[self.source1]
+        source2_node = nodes[self.source2]
+
+        with tf.device('/gpu:0'):
+            nodes[self.name] = tf.squared_difference(
+                source1_node, source2_node)
+
+        return nodes
+
+class AdamOptimizer(yaml.YAMLObject):
+    yaml_tag = u'!adam_optimizer'
+
+    def __init__(self, name, source, val):
+        self.name = name
+        self.source = source
+        self.val = val
+
+    def __repr__(self):
+        return 'AdamOptimizer'
+
+    def build(self, nodes):
+        source_node = nodes[self.source]
+
+        with tf.device('/gpu:0'):
+            global_step = tf.get_variable(
+                'global_step', (),
+                initializer=tf.constant_initializer(0), trainable=False)
+            nodes[self.name] = tf.train.AdamOptimizer(self.val).minimize(
+                source_node, global_step=global_step)
+
         return nodes
 
 class MaxPool2x2(yaml.YAMLObject):
