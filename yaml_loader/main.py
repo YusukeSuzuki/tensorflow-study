@@ -13,3 +13,10 @@ print('-- ops --')
 for op in tf.get_default_graph().get_operations():
     print(op.name)
 
+sess = tf.Session()
+writer = tf.train.SummaryWriter('logs', sess.graph)
+init = tf.initialize_all_variables()
+sess.run(init)
+writer.add_graph(tf.get_default_graph())
+writer.close()
+

@@ -101,6 +101,7 @@ class Conv2d(yaml.YAMLObject):
     def build(self, nodes):
         source_node = nodes[self.source]
         channels = source_node.get_shape()[3]
+        print("{}: {}".format(source_node.name, source_node.get_shape()))
         w = weight_variable(
             [self.width,self.height, channels,self.kernel_num],
             name="weight")
@@ -132,7 +133,7 @@ class Conv2dTranspose(yaml.YAMLObject):
             filter_var = tf.get_variable('filter',
                 [self.height, self.width, out_shape[3], shape[3]],
                 initializer=tf.truncated_normal_initializer(stddev=0.35))
-        with tf.name_scope('deconvolution'), tf.device('/gpu:0'):
+        with tf.name_scope('deconvolution'), tf.device('/cpu:0'):
             nodes[self.name] = tf.nn.conv2d_transpose(
                 source_node, filter_var,
                 shape_source_node.get_shape(), [1,1,1,1])
@@ -154,7 +155,7 @@ class Conv2dAELoss(yaml.YAMLObject):
         source1_node = nodes[self.source1]
         source2_node = nodes[self.source2]
 
-        with tf.device('/gpu:0'):
+        with tf.device('/cpu:0'):
             nodes[self.name] = tf.squared_difference(
                 source1_node, source2_node)
 
@@ -174,7 +175,7 @@ class AdamOptimizer(yaml.YAMLObject):
     def build(self, nodes):
         source_node = nodes[self.source]
 
-        with tf.device('/gpu:0'):
+        with tf.device('/cpu:0'):
             global_step = tf.get_variable(
                 'global_step', (),
                 initializer=tf.constant_initializer(0), trainable=False)
@@ -195,9 +196,10 @@ class MaxPool2x2(yaml.YAMLObject):
 
     def build(self, nodes):
         source_node = nodes[self.source]
+        print("{}: {}".format(source_node.name, source_node.get_shape()))
         nodes[self.name] = tf.nn.max_pool(
             source_node, ksize=[1,2,2,1],
-            strides=[1,2,2,1], padding='SAME')[3]
+            strides=[1,2,2,1], padding='SAME')
         return nodes
 
 # ------------------------------------------------------------
